@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BurgerBrows Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .feature {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .emoji {
+            font-size: 3em;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .stats {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .stat {
+            display: inline-block;
+            margin: 0 20px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            min-width: 100px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍔 BurgerBrows Test Page</h1>
+        
+        <p>Welcome to the BurgerBrows internal test page! This page demonstrates that the browser functionality is working correctly.</p>
+        
+        <div class="features">
+            <div class="feature">
+                <span class="emoji">🌐</span>
+                <h3>Web Browsing</h3>
+                <p>Browse the web while earning USDC rewards for your activity.</p>
+            </div>
+            
+            <div class="feature">
+                <span class="emoji">💰</span>
+                <h3>DeFi Wallet</h3>
+                <p>Integrated Ethereum wallet with USDC support and faucet functionality.</p>
+            </div>
+            
+            <div class="feature">
+                <span class="emoji">🎁</span>
+                <h3>Rewards System</h3>
+                <p>Earn rewards for browsing activities and claim them instantly.</p>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat">
+                <div style="font-size: 1.5em; font-weight: bold;">42</div>
+                <div>Active Users</div>
+            </div>
+            <div class="stat">
+                <div style="font-size: 1.5em; font-weight: bold;">1,337</div>
+                <div>USDC Earned</div>
+            </div>
+            <div class="stat">
+                <div style="font-size: 1.5em; font-weight: bold;">100%</div>
+                <div>Uptime</div>
+            </div>
+        </div>
+        
+        <h2>🚀 Test Features</h2>
+        <ul>
+            <li>✅ Wallet Creation & Management</li>
+            <li>✅ USDC Balance Checking</li>
+            <li>✅ Faucet Functionality (100 USDC)</li>
+            <li>✅ Reward Claims (10 USDC)</li>
+            <li>✅ USDC Transfers</li>
+            <li>✅ Real Blockchain Integration (Sepolia)</li>
+        </ul>
+        
+        <p><strong>Note:</strong> This is a test environment using Ethereum Sepolia testnet. All USDC is test currency with no real value.</p>
+        
+        <div class="footer">
+            <p>🔗 Powered by BurgerBrows | Built with ❤️ for hackathons</p>
+        </div>
+    </div>
+    
+    <script>
+        // Simulate some activity
+        console.log('BurgerBrows test page loaded successfully! 🎉');
+        
+        // Update stats randomly every 5 seconds
+        setInterval(() => {
+            const activeUsers = document.querySelector('.stat:first-child div:first-child');
+            const usdcEarned = document.querySelector('.stat:nth-child(2) div:first-child');
+            
+            if (activeUsers && usdcEarned) {
+                activeUsers.textContent = Math.floor(Math.random() * 100) + 20;
+                usdcEarned.textContent = Math.floor(Math.random() * 2000) + 1000;
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
