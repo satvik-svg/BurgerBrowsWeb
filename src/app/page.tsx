@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { Wallet, Globe, DollarSign, Gift, TrendingUp, Home } from 'lucide-react';
 
-// Contract addresses from your Python app
+// Contract addresses from environment variables
 const CONTRACTS = {
-  USDC_ADDRESS: '0xE32f7a8eB4Fb132675292306A5928071d126F082',
-  BROWSER_VAULT: '0x9dAE42f31DB601fD0094c05d5b52Eb0a3074f786',
-  REWARD_POOL: '0xc7Fd8EF7Ee3e93e8eff2E12715E504aDfbaE3750'
+  USDC_ADDRESS: process.env.NEXT_PUBLIC_USDC_ADDRESS || '0xE32f7a8eB4Fb132675292306A59280719d126F082',
+  BROWSER_VAULT: process.env.NEXT_PUBLIC_BROWSER_VAULT || '0x9dAE42f31DB601fD0094c05d5b52Eb0a3074f786',
+  REWARD_POOL: process.env.NEXT_PUBLIC_REWARD_POOL || '0xc7Fd8EF7Ee3e93e8eff2E127151E504aDfbaE3750'
 };
 
 // USDC ABI for comprehensive operations
@@ -20,7 +20,7 @@ const USDC_ABI = [
   "function allowance(address owner, address spender) view returns (uint256)"
 ];
 
-const RPC_URL = 'https://eth-sepolia.g.alchemy.com/v2/wvPB7N5GFQnyBB2FRL9L9';
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/wvPB7N5GFQnyBB2FRL9L9';
 
 interface UserWallet {
   address: string;
@@ -145,7 +145,7 @@ export default function BurgerBrowsApp() {
     }
   };
 
-  // Mint test USDC from faucet (using hackathon wallet for demo purposes)
+  // Mint test USDC from faucet (using environment variable for demo purposes)
   const mintTestUSDC = async () => {
     if (!provider || !wallet) return;
 
@@ -155,10 +155,13 @@ export default function BurgerBrowsApp() {
       
       // NOTE: In production, this would be a proper faucet contract or API
       // For hackathon demo, using pre-funded wallet with mint permissions
-      const faucetWallet = new ethers.Wallet(
-        '0x05b40792c4a08ab87063e304a619f586921473c6bd74834e322a9fc202951eec',
-        provider
-      );
+      const faucetPrivateKey = process.env.NEXT_PUBLIC_FAUCET_PRIVATE_KEY;
+      if (!faucetPrivateKey) {
+        addLog(`❌ Faucet not configured - missing environment variable`);
+        return;
+      }
+      
+      const faucetWallet = new ethers.Wallet(faucetPrivateKey, provider);
       
       const contract = new ethers.Contract(CONTRACTS.USDC_ADDRESS, USDC_ABI, faucetWallet);
       const amount = ethers.parseUnits('100', 6);
@@ -238,10 +241,13 @@ export default function BurgerBrowsApp() {
       
       // NOTE: In production, this would check user's earned rewards from smart contract
       // For hackathon demo, simulate reward distribution
-      const faucetWallet = new ethers.Wallet(
-        '0x05b40792c4a08ab87063e304a619f586921473c6bd74834e322a9fc202951eec',
-        provider
-      );
+      const faucetPrivateKey = process.env.NEXT_PUBLIC_FAUCET_PRIVATE_KEY;
+      if (!faucetPrivateKey) {
+        addLog(`❌ Rewards not configured - missing environment variable`);
+        return;
+      }
+      
+      const faucetWallet = new ethers.Wallet(faucetPrivateKey, provider);
       
       const contract = new ethers.Contract(CONTRACTS.USDC_ADDRESS, USDC_ABI, faucetWallet);
       const rewardAmount = ethers.parseUnits('10', 6); // 10 USDC reward
