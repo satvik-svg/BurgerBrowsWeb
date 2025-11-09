@@ -6,21 +6,30 @@ import { Wallet, Globe, DollarSign, Gift, TrendingUp, Home } from 'lucide-react'
 
 // Contract addresses from environment variables
 const CONTRACTS = {
-  USDC_ADDRESS: process.env.NEXT_PUBLIC_USDC_ADDRESS || '0xE32f7a8eB4Fb132675292306A59280719d126F082',
-  BROWSER_VAULT: process.env.NEXT_PUBLIC_BROWSER_VAULT || '0x9dAE42f31DB601fD0094c05d5b52Eb0a3074f786',
-  REWARD_POOL: process.env.NEXT_PUBLIC_REWARD_POOL || '0xc7Fd8EF7Ee3e93e8eff2E127151E504aDfbaE3750'
+  MOCK_USDC: process.env.NEXT_PUBLIC_MOCK_USDC,
+  BROWSER_VAULT: process.env.NEXT_PUBLIC_BROWSER_VAULT,
+  REWARD_POOL: process.env.NEXT_PUBLIC_REWARD_POOL,
+  HACKATHON_WALLET: process.env.NEXT_PUBLIC_HACKATHON_WALLET
 };
 
-// USDC ABI for comprehensive operations
-const USDC_ABI = [
+// MockUSDC ABI for comprehensive operations  
+const MOCK_USDC_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
-  "function mint(address to, uint256 amount) external",
   "function transfer(address to, uint256 amount) returns (bool)",
   "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)"
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function mint(address to, uint256 amount) returns (bool)", // MockUSDC has mint function
 ];
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/wvPB7N5GFQnyBB2FRL9L9';
+// BrowserVault ABI for deposit functionality
+const BROWSER_VAULT_ABI = [
+  "function deposit(uint256 amount) external",
+  "function getBalance(address user) view returns (uint256)",
+  "function withdraw(uint256 amount) external",
+];
+
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL;
 
 interface UserWallet {
   address: string;
@@ -35,8 +44,6 @@ export default function BurgerBrowsApp() {
   const [provider, setProvider] = useState<ethers.JsonRpcProvider | null>(null);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>(['🚀 BurgerBrows Web initialized!']);
-  const [transferAmount, setTransferAmount] = useState('');
-  const [transferAddress, setTransferAddress] = useState('');
   const [browserError, setBrowserError] = useState('');
   const [showWalletPopup, setShowWalletPopup] = useState(false);
 
@@ -109,35 +116,56 @@ export default function BurgerBrowsApp() {
 
   // Initialize provider and wallet on mount
   useEffect(() => {
-    const provider = new ethers.JsonRpcProvider(RPC_URL);
-    setProvider(provider);
-    
-    const walletData = initializeWallet();
-    
-    // Check initial balance
-    if (walletData) {
-      checkBalance(provider, walletData.address);
+    try {
+      // Validate required environment variables
+      if (!RPC_URL) {
+        addLog(`❌ RPC URL not configured`);
+        return;
+      }
+      if (!CONTRACTS.MOCK_USDC || !CONTRACTS.BROWSER_VAULT || !CONTRACTS.REWARD_POOL) {
+        addLog(`❌ Contract addresses not configured`);
+        return;
+      }
+
+      addLog(`🔗 Connecting to RPC: ${RPC_URL.slice(0, 50)}...`);
+      addLog(`📋 Using MockUSDC contract: ${CONTRACTS.MOCK_USDC.slice(0, 20)}...`);
+      const provider = new ethers.JsonRpcProvider(RPC_URL);
+      setProvider(provider);
+      
+      const walletData = initializeWallet();
+      
+      // Check initial balance
+      if (walletData) {
+        addLog(`💼 Wallet loaded: ${walletData.address.slice(0, 10)}...`);
+        checkBalance(provider, walletData.address);
+      }
+    } catch (error) {
+      addLog(`❌ Failed to initialize: ${error}`);
     }
   }, []);
 
-  // Check USDC balance
+  // Check MockUSDC balance
   const checkBalance = async (providerInstance?: ethers.JsonRpcProvider, address?: string) => {
     if (!provider && !providerInstance) return;
     if (!wallet && !address) return;
+    if (!CONTRACTS.MOCK_USDC) {
+      addLog(`❌ MockUSDC contract not configured`);
+      return;
+    }
 
     const activeProvider = providerInstance || provider!;
     const walletAddress = address || wallet!.address;
 
     try {
       setLoading(true);
-      addLog(`🏦 Checking USDC balance...`);
+      addLog(`🏦 Checking MockUSDC balance...`);
       
-      const contract = new ethers.Contract(CONTRACTS.USDC_ADDRESS, USDC_ABI, activeProvider);
+      const contract = new ethers.Contract(CONTRACTS.MOCK_USDC, MOCK_USDC_ABI, activeProvider);
       const balance = await contract.balanceOf(walletAddress);
       const formattedBalance = ethers.formatUnits(balance, 6);
       
       setBalance(formattedBalance);
-      addLog(`💰 USDC Balance: ${formattedBalance}`);
+      addLog(`💰 MockUSDC Balance: ${formattedBalance}`);
     } catch (error) {
       addLog(`❌ Error checking balance: ${error}`);
     } finally {
@@ -145,84 +173,97 @@ export default function BurgerBrowsApp() {
     }
   };
 
-  // Mint test USDC from faucet (using environment variable for demo purposes)
+  // Get test USDC from MockUSDC faucet using mint function
   const mintTestUSDC = async () => {
     if (!provider || !wallet) return;
+    if (!CONTRACTS.MOCK_USDC) {
+      addLog(`❌ MockUSDC contract not configured`);
+      return;
+    }
 
     try {
       setLoading(true);
-      addLog(`🚰 Getting 100 test USDC from faucet...`);
+      addLog(`🚰 Minting 100 test USDC from MockUSDC faucet...`);
       
-      // NOTE: In production, this would be a proper faucet contract or API
-      // For hackathon demo, using pre-funded wallet with mint permissions
-      const faucetPrivateKey = process.env.NEXT_PUBLIC_FAUCET_PRIVATE_KEY;
-      if (!faucetPrivateKey) {
-        addLog(`❌ Faucet not configured - missing environment variable`);
+      // Use hackathon wallet to call mint function
+      const hackathonPrivateKey = process.env.NEXT_PUBLIC_HACKATHON_PRIVATE_KEY;
+      if (!hackathonPrivateKey) {
+        addLog(`❌ Hackathon wallet not configured`);
         return;
       }
+      const hackathonWallet = new ethers.Wallet(hackathonPrivateKey, provider);
       
-      const faucetWallet = new ethers.Wallet(faucetPrivateKey, provider);
-      
-      const contract = new ethers.Contract(CONTRACTS.USDC_ADDRESS, USDC_ABI, faucetWallet);
-      const amount = ethers.parseUnits('100', 6);
+      // Create MockUSDC contract instance
+      const contract = new ethers.Contract(CONTRACTS.MOCK_USDC, MOCK_USDC_ABI, hackathonWallet);
+      const amount = ethers.parseUnits('100', 6); // 100 USDC
       
       addLog(`🎯 Minting to your wallet: ${wallet.address.slice(0, 20)}...`);
       
+      // Call mint function (only available on MockUSDC, not real USDC)
       const tx = await contract.mint(wallet.address, amount);
-      addLog(`📤 Transaction sent: ${tx.hash.slice(0, 20)}...`);
+      addLog(`📤 Mint transaction sent: ${tx.hash.slice(0, 20)}...`);
       
       const receipt = await tx.wait();
-      addLog(`✅ USDC minted successfully!`);
+      addLog(`✅ MockUSDC minted successfully!`);
       addLog(`🔗 Block: ${receipt.blockNumber}`);
       
       // Update balance
       setTimeout(() => checkBalance(), 2000);
     } catch (error) {
-      addLog(`❌ Faucet error: ${error}`);
+      addLog(`❌ Mint error: ${error}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Deposit USDC into BrowserVault (real implementation)
+  // Deposit USDC into BrowserVault (real implementation matching Python version)
   const depositUSDC = async () => {
     if (!provider || !wallet) return;
+    if (!CONTRACTS.MOCK_USDC || !CONTRACTS.BROWSER_VAULT) {
+      addLog(`❌ Contract addresses not configured`);
+      return;
+    }
 
     try {
       setLoading(true);
-      addLog(`🏦 Preparing USDC deposit to BrowserVault...`);
+      addLog(`🏦 Preparing MockUSDC deposit to BrowserVault...`);
       
       // Create user wallet instance
       const userWallet = new ethers.Wallet(wallet.privateKey, provider);
       
       // Check current balance first
-      const usdcContract = new ethers.Contract(CONTRACTS.USDC_ADDRESS, USDC_ABI, userWallet);
+      const usdcContract = new ethers.Contract(CONTRACTS.MOCK_USDC, MOCK_USDC_ABI, userWallet);
       const balance = await usdcContract.balanceOf(wallet.address);
       
       if (balance === BigInt(0)) {
-        addLog(`❌ No USDC to deposit. Use faucet first!`);
+        addLog(`❌ No MockUSDC to deposit. Use faucet first!`);
         return;
       }
       
       const depositAmount = ethers.parseUnits('50', 6); // Deposit 50 USDC
       
       if (balance < depositAmount) {
-        addLog(`❌ Insufficient balance. Need 50 USDC, have ${ethers.formatUnits(balance, 6)}`);
+        addLog(`❌ Insufficient balance. Need 50 MockUSDC, have ${ethers.formatUnits(balance, 6)}`);
         return;
       }
       
-      // Approve spending
-      addLog(`🔐 Approving USDC spending...`);
+      // Step 1: Approve BrowserVault to spend USDC
+      addLog(`🔐 Approving BrowserVault to spend MockUSDC...`);
       const approveTx = await usdcContract.approve(CONTRACTS.BROWSER_VAULT, depositAmount);
       await approveTx.wait();
+      addLog(`✅ Approval confirmed`);
       
-      addLog(`🏦 Depositing 50 USDC to vault...`);
+      // Step 2: Deposit to BrowserVault
+      addLog(`🏦 Depositing 50 MockUSDC to BrowserVault...`);
+      const vaultContract = new ethers.Contract(CONTRACTS.BROWSER_VAULT, BROWSER_VAULT_ABI, userWallet);
+      const depositTx = await vaultContract.deposit(depositAmount);
       
-      // For demo, we'll just log the deposit since we need the BrowserVault ABI
-      addLog(`✅ Would deposit 50 USDC to BrowserVault`);
-      addLog(`📝 Note: Full vault integration requires contract ABI`);
+      addLog(`📤 Deposit transaction: ${depositTx.hash.slice(0, 20)}...`);
+      const receipt = await depositTx.wait();
+      addLog(`✅ Successfully deposited 50 MockUSDC to vault!`);
+      addLog(`� Block: ${receipt.blockNumber}`);
       
-      // Update balance after deposit simulation
+      // Update balance
       setTimeout(() => checkBalance(), 2000);
     } catch (error) {
       addLog(`❌ Deposit error: ${error}`);
@@ -231,30 +272,39 @@ export default function BurgerBrowsApp() {
     }
   };
 
-  // Claim rewards (using hackathon wallet for reward distribution)
+  // Claim rewards (transfer MockUSDC from hackathon wallet)
   const claimRewards = async () => {
     if (!provider || !wallet) return;
+    if (!CONTRACTS.MOCK_USDC) {
+      addLog(`❌ MockUSDC contract not configured`);
+      return;
+    }
 
     try {
       setLoading(true);
       addLog(`🎁 Claiming browsing rewards...`);
       
-      // NOTE: In production, this would check user's earned rewards from smart contract
-      // For hackathon demo, simulate reward distribution
-      const faucetPrivateKey = process.env.NEXT_PUBLIC_FAUCET_PRIVATE_KEY;
-      if (!faucetPrivateKey) {
-        addLog(`❌ Rewards not configured - missing environment variable`);
+      // Use hardcoded hackathon wallet (fee payer for rewards)
+      const hackathonPrivateKey = process.env.NEXT_PUBLIC_HACKATHON_PRIVATE_KEY;
+      if (!hackathonPrivateKey) {
+        addLog(`❌ Hackathon wallet not configured`);
+        return;
+      }
+      const hackathonWallet = new ethers.Wallet(hackathonPrivateKey, provider);
+      
+      const contract = new ethers.Contract(CONTRACTS.MOCK_USDC, MOCK_USDC_ABI, hackathonWallet);
+      const rewardAmount = ethers.parseUnits('10', 6); // 10 USDC reward
+      
+      // Check hackathon wallet balance
+      const hackathonBalance = await contract.balanceOf(hackathonWallet.address);
+      if (hackathonBalance < rewardAmount) {
+        addLog(`❌ Insufficient reward funds. Available: ${ethers.formatUnits(hackathonBalance, 6)} USDC`);
         return;
       }
       
-      const faucetWallet = new ethers.Wallet(faucetPrivateKey, provider);
-      
-      const contract = new ethers.Contract(CONTRACTS.USDC_ADDRESS, USDC_ABI, faucetWallet);
-      const rewardAmount = ethers.parseUnits('10', 6); // 10 USDC reward
-      
       addLog(`🏆 Distributing 10 USDC browsing reward...`);
       
-      const tx = await contract.mint(wallet.address, rewardAmount);
+      const tx = await contract.transfer(wallet.address, rewardAmount);
       addLog(`📤 Reward transaction: ${tx.hash.slice(0, 20)}...`);
       
       const receipt = await tx.wait();
@@ -265,57 +315,6 @@ export default function BurgerBrowsApp() {
       setTimeout(() => checkBalance(), 2000);
     } catch (error) {
       addLog(`❌ Claim error: ${error}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Transfer USDC to another address (real implementation using user's wallet)
-  const transferUSDC = async (toAddress: string, amount: string) => {
-    if (!provider || !wallet) return;
-
-    try {
-      setLoading(true);
-      addLog(`💸 Preparing to send ${amount} USDC...`);
-      
-      // Validate inputs
-      if (!ethers.isAddress(toAddress)) {
-        addLog(`❌ Invalid recipient address`);
-        return;
-      }
-      
-      if (parseFloat(amount) <= 0) {
-        addLog(`❌ Invalid amount`);
-        return;
-      }
-      
-      // Create user wallet instance for signing transactions
-      const userWallet = new ethers.Wallet(wallet.privateKey, provider);
-      
-      // Check balance
-      const usdcContract = new ethers.Contract(CONTRACTS.USDC_ADDRESS, USDC_ABI, userWallet);
-      const currentBalance = await usdcContract.balanceOf(wallet.address);
-      const transferAmount = ethers.parseUnits(amount, 6);
-      
-      if (currentBalance < transferAmount) {
-        addLog(`❌ Insufficient balance. Have ${ethers.formatUnits(currentBalance, 6)} USDC`);
-        return;
-      }
-      
-      addLog(`📤 Sending ${amount} USDC to ${toAddress.slice(0, 8)}...${toAddress.slice(-4)}`);
-      
-      // Execute transfer using user's wallet
-      const tx = await usdcContract.transfer(toAddress, transferAmount);
-      addLog(`🔄 Transaction submitted: ${tx.hash.slice(0, 20)}...`);
-      
-      const receipt = await tx.wait();
-      addLog(`✅ Transfer completed!`);
-      addLog(`🔗 Block: ${receipt.blockNumber}`);
-      
-      // Update balance
-      setTimeout(() => checkBalance(), 2000);
-    } catch (error) {
-      addLog(`❌ Transfer failed: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -428,7 +427,7 @@ export default function BurgerBrowsApp() {
                 <button
                   onClick={() => {
                     checkBalance();
-                    setShowWalletPopup(false);
+                    // Don't close popup, let user see the result
                   }}
                   disabled={loading}
                   className="group flex flex-col items-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 rounded-xl border border-blue-200 disabled:opacity-50 transition-all"
@@ -440,9 +439,10 @@ export default function BurgerBrowsApp() {
                 </button>
 
                 <button
-                  onClick={() => {
-                    mintTestUSDC();
-                    setShowWalletPopup(false);
+                  onClick={async () => {
+                    await mintTestUSDC();
+                    // Refresh balance after minting
+                    setTimeout(() => checkBalance(), 3000);
                   }}
                   disabled={loading}
                   className="group flex flex-col items-center p-4 bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 rounded-xl border border-green-200 disabled:opacity-50 transition-all"
@@ -450,13 +450,14 @@ export default function BurgerBrowsApp() {
                   <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                     <Globe size={20} className="text-white" />
                   </div>
-                  <span className="text-sm font-semibold text-green-800">Get 100 USDC</span>
+                  <span className="text-sm font-semibold text-green-800">MockUSDC Faucet</span>
                 </button>
 
                 <button
-                  onClick={() => {
-                    depositUSDC();
-                    setShowWalletPopup(false);
+                  onClick={async () => {
+                    await depositUSDC();
+                    // Refresh balance after deposit
+                    setTimeout(() => checkBalance(), 3000);
                   }}
                   disabled={loading}
                   className="group flex flex-col items-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 rounded-xl border border-purple-200 disabled:opacity-50 transition-all"
@@ -464,13 +465,14 @@ export default function BurgerBrowsApp() {
                   <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                     <TrendingUp size={20} className="text-white" />
                   </div>
-                  <span className="text-sm font-semibold text-purple-800">Deposit DeFi</span>
+                  <span className="text-sm font-semibold text-purple-800">Deposit to Vault</span>
                 </button>
 
                 <button
-                  onClick={() => {
-                    claimRewards();
-                    setShowWalletPopup(false);
+                  onClick={async () => {
+                    await claimRewards();
+                    // Refresh balance after claiming rewards
+                    setTimeout(() => checkBalance(), 3000);
                   }}
                   disabled={loading}
                   className="group flex flex-col items-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 rounded-xl border border-orange-200 disabled:opacity-50 transition-all"
@@ -478,52 +480,7 @@ export default function BurgerBrowsApp() {
                   <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                     <Gift size={20} className="text-white" />
                   </div>
-                  <span className="text-sm font-semibold text-orange-800">Claim +10 USDC</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Send USDC Section */}
-            <div className="px-4 pb-4 border-t border-gray-100 pt-4">
-              <h4 className="font-bold text-gray-800 mb-3 flex items-center">
-                <span className="mr-2">💸</span>
-                Send USDC
-              </h4>
-              <div className="space-y-3">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Recipient address (0x...)"
-                    value={transferAddress}
-                    onChange={(e) => setTransferAddress(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div className="relative">
-                  <input
-                    type="number"
-                    placeholder="Amount (USDC)"
-                    value={transferAmount}
-                    onChange={(e) => setTransferAmount(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-500">
-                    USDC
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    if (transferAddress && transferAmount) {
-                      transferUSDC(transferAddress, transferAmount);
-                      setTransferAddress('');
-                      setTransferAmount('');
-                      setShowWalletPopup(false);
-                    }
-                  }}
-                  disabled={loading || !transferAddress || !transferAmount}
-                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 disabled:bg-gray-300 text-white rounded-lg font-semibold transition-all transform hover:scale-[1.02] disabled:hover:scale-100 shadow-lg"
-                >
-                  {loading ? '🔄 Sending...' : '💸 Send USDC'}
+                  <span className="text-sm font-semibold text-orange-800">Claim Rewards</span>
                 </button>
               </div>
             </div>
@@ -546,8 +503,8 @@ export default function BurgerBrowsApp() {
         </div>
       )}
 
-      {/* Main Browser Area */}
-      <div className="flex-1 flex flex-col">
+      {/* Main Content */}
+      <div className="flex flex-1">
         {/* Navigation Bar */}
         <div className="bg-white border-b border-gray-200 p-3 shadow-sm">
           <div className="flex items-center space-x-3 mb-3">
